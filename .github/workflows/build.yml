@@ -99,13 +99,9 @@ jobs:
             echo "⚠️ anykernel.sh tidak ditemukan, skip customize."
           fi
 
-      - name: Setup Neutron Clang (toolchain paling stabil, jarang error)
+      - name: Setup Proton Clang (kompatibel penuh sama Ubuntu 22.04, jarang error)
         run: |
-          mkdir -p clang
-          cd clang
-          curl -LO "https://raw.githubusercontent.com/Neutron-Toolchains/antman/main/antman"
-          chmod +x antman
-          ./antman -S
+          git clone --depth=1 https://github.com/kdrag0n/proton-clang.git clang
           echo "$GITHUB_WORKSPACE/clang/bin" >> $GITHUB_PATH
 
       - name: Export environment
