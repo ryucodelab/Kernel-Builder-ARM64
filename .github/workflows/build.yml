@@ -72,7 +72,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y bc bison build-essential ccache curl flex \
-            g++-multilib gcc-multilib gcc-aarch64-linux-gnu gcc-arm-linux-gnueabihf \
+            gcc-aarch64-linux-gnu gcc-arm-linux-gnueabihf \
             git gnupg gperf imagemagick lib32ncurses5-dev lib32readline-dev \
             lib32z1-dev liblz4-tool libncurses5-dev libsdl1.2-dev libssl-dev \
             libxml2 libxml2-utils lzop pngcrush rsync schedtool squashfs-tools \
@@ -215,4 +215,3 @@ jobs:
 
           Cek log buat lihat error-nya." \
             -d reply_markup="{\"inline_keyboard\":[[{\"text\":\"📄 Cek Log Error\",\"url\":\"${RUN_URL}\"}]]}"
-            
