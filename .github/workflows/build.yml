@@ -25,11 +25,6 @@ on:
         required: false
         type: string
         default: "-CustomKernel"
-      WORKSPACE_NAME:
-        description: "Workspace name"
-        required: true
-        type: string
-        default: "kernel-workspace"
       DEVICE_CODENAME:
         description: "Device codename (contoh: violet)"
         required: true
@@ -38,6 +33,11 @@ on:
         description: "Kernel Name (contoh: Stormbreaker)"
         required: true
         type: string
+      KBUILDUSER:
+        description: "Build User (KBUILD_BUILD_USER)"
+        required: false
+        type: string
+        default: "Builder"
 
 jobs:
   build:
@@ -80,7 +80,7 @@ jobs:
 
       - name: Clone kernel source
         run: |
-          git clone --depth=1 -b "${{ inputs.KERNEL_BRANCH }}" "${{ inputs.KERNEL_SOURCE }}" "${{ inputs.WORKSPACE_NAME }}"
+          git clone --depth=1 -b "${{ inputs.KERNEL_BRANCH }}" "${{ inputs.KERNEL_SOURCE }}" kernel_src
 
       - name: Clone AnyKernel3
         run: |
@@ -99,39 +99,30 @@ jobs:
             echo "⚠️ anykernel.sh tidak ditemukan, skip customize."
           fi
 
-      - name: Setup Proton Clang (kompatibel penuh sama Ubuntu 22.04, jarang error)
-        run: |
-          git clone --depth=1 https://github.com/kdrag0n/proton-clang.git clang
-          echo "$GITHUB_WORKSPACE/clang/bin" >> $GITHUB_PATH
-
       - name: Export environment
         run: |
           echo "ARCH=arm64" >> $GITHUB_ENV
           echo "SUBARCH=arm64" >> $GITHUB_ENV
-          echo "KBUILD_BUILD_USER=Builder" >> $GITHUB_ENV
+          echo "KBUILD_BUILD_USER=${{ inputs.KBUILDUSER }}" >> $GITHUB_ENV
           echo "KBUILD_BUILD_HOST=GitHubActions" >> $GITHUB_ENV
 
       - name: Generate defconfig
-        working-directory: ${{ inputs.WORKSPACE_NAME }}
+        working-directory: kernel_src
         run: |
-          export PATH="$GITHUB_WORKSPACE/clang/bin:$PATH"
           make O=out ARCH=arm64 ${{ inputs.KERNEL_DEFCONFIG }}
 
       - name: Build kernel
-        working-directory: ${{ inputs.WORKSPACE_NAME }}
+        working-directory: kernel_src
         run: |
-          export PATH="$GITHUB_WORKSPACE/clang/bin:$PATH"
           export LOCALVERSION="${{ inputs.LOCALVERSION }}"
           make -j$(nproc --all) O=out ARCH=arm64 \
-            CC=clang \
-            LLVM=1 \
-            LLVM_IAS=1 \
             CROSS_COMPILE=aarch64-linux-gnu- \
-            CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
+            CROSS_COMPILE_ARM32=arm-linux-gnueabihf- \
+            HOSTCFLAGS="-fcommon" \
             2>&1 | tee build.log
 
       - name: Cek & deteksi otomatis hasil build
-        working-directory: ${{ inputs.WORKSPACE_NAME }}
+        working-directory: kernel_src
         run: |
           BOOT_DIR="out/arch/arm64/boot"
           # Urutan prioritas: paling lengkap (udah include dtb) ke paling basic
@@ -154,7 +145,7 @@ jobs:
 
       - name: Package dengan AnyKernel3
         run: |
-          cd "${{ inputs.WORKSPACE_NAME }}/out/arch/arm64/boot"
+          cd "kernel_src/out/arch/arm64/boot"
           # Cuma copy image yang beneran kedetect, bukan asal Image*
           cp "$KERNEL_IMAGE" "$GITHUB_WORKSPACE/AnyKernel3/Image" 2>/dev/null || true
           [ -f dtbo.img ] && cp dtbo.img "$GITHUB_WORKSPACE/AnyKernel3/" || true
@@ -169,7 +160,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ inputs.WORKSPACE_NAME }}-kernel
+          name: ${{ inputs.KERNEL_NAME }}-${{ inputs.DEVICE_CODENAME }}-kernel
           path: AnyKernel3/${{ env.ZIP_NAME }}
 
       - name: Upload build log (buat debug kalau error)
@@ -177,7 +168,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: build-log
-          path: ${{ inputs.WORKSPACE_NAME }}/build.log
+          path: kernel_src/build.log
 
       - name: Notify Telegram - Build Success
         if: success()
